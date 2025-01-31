@@ -1,0 +1,68 @@
+{
+  "project_info": {
+    "project_number": "589201624295",
+    "firebase_url": "https://vetconnect-5a6ba-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "vetconnect-5a6ba",
+    "storage_bucket": "vetconnect-5a6ba.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:589201624295:android:3f2f17dd3892d000f72642",
+        "android_client_info": {
+          "package_name": "com.example.vet_co"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC1WUhCNgcV9CtxKlewV_rCYtODm8JquUU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:589201624295:android:03cdc7716a895db1f72642",
+        "android_client_info": {
+          "package_name": "com.example.vet_connect"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC1WUhCNgcV9CtxKlewV_rCYtODm8JquUU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:589201624295:android:3fa15fb3026b7706f72642",
+        "android_client_info": {
+          "package_name": "com.vet.connect"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC1WUhCNgcV9CtxKlewV_rCYtODm8JquUU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
