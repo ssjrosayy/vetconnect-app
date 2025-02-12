@@ -18,34 +18,35 @@ class AddVetPage extends StatefulWidget {
 
 class _AddVetPageState extends State<AddVetPage> {
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _nameController;
-  late TextEditingController _addressController;
-  late TextEditingController _openingTimeController;
-  late TextEditingController _closingTimeController;
-  late TextEditingController _descriptionController;
-  late TextEditingController _websiteController;
-  late TextEditingController _phoneController;
-  late TextEditingController _emailController;
-  late TextEditingController _feeController;
-  File? _selectedImage;
+  final _nameController = TextEditingController();
+  final _specializationController = TextEditingController();
+  final _experienceController = TextEditingController();
+  final _locationController = TextEditingController();
+  final _aboutController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _websiteController = TextEditingController();
+  final _openingTimeController = TextEditingController();
+  final _closingTimeController = TextEditingController();
   bool _isEmergencyAvailable = false;
+  String _imagePath = '';
+
+  File? _selectedImage;
   List<TimeOfDay> selectedSlots = [];
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.vet?.name ?? '');
-    _descriptionController =
-        TextEditingController(text: widget.vet?.description ?? '');
-    _addressController = TextEditingController(text: widget.vet?.address ?? '');
-    _openingTimeController =
-        TextEditingController(text: widget.vet?.openingTime ?? '');
-    _closingTimeController =
-        TextEditingController(text: widget.vet?.closingTime ?? '');
-    _websiteController = TextEditingController(text: widget.vet?.website ?? '');
-    _phoneController = TextEditingController(text: widget.vet?.phone ?? '');
-    _emailController = TextEditingController(text: widget.vet?.email ?? '');
-    _feeController = TextEditingController(); // New fee controller
+    _nameController.text = widget.vet?.name ?? '';
+    _specializationController.text = widget.vet?.specialization ?? '';
+    _experienceController.text = widget.vet?.experience ?? '';
+    _locationController.text = widget.vet?.location ?? '';
+    _aboutController.text = widget.vet?.about ?? '';
+    _phoneController.text = widget.vet?.phoneNumber ?? '';
+    _emailController.text = widget.vet?.email ?? '';
+    _websiteController.text = widget.vet?.website ?? '';
+    _openingTimeController.text = widget.vet?.openingTime ?? '';
+    _closingTimeController.text = widget.vet?.closingTime ?? '';
     _isEmergencyAvailable = widget.vet?.isEmergencyAvailable ?? false;
   }
 
@@ -62,51 +63,37 @@ class _AddVetPageState extends State<AddVetPage> {
     }
   }
 
-  Future<void> _saveToFirestore(VetModel vet) async {
-    final firestore = FirebaseFirestore.instance;
-
-    try {
-      final imageUrl =
-          _selectedImage != null ? await _uploadImage(_selectedImage!) : null;
-
-      final vetData = vet.toJson();
-      if (imageUrl != null) vetData['imageUrl'] = imageUrl;
-      vetData['fee'] = int.tryParse(_feeController.text) ?? 0; // Save fee
-      vetData['availableSlots'] = selectedSlots
-          .map((slot) => slot.format(context))
-          .toList(); // Save selected slots
-
-      await firestore.collection('vets').add(vetData);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vet saved successfully!')),
-      );
-    } catch (e) {
-      print('Error saving vet: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to save vet. Please try again.')),
-      );
-    }
-  }
-
-  void _submitForm() {
+  Future<void> _saveVet() async {
     if (_formKey.currentState!.validate()) {
-      final newVet = VetModel(
-        id: '', // Firestore will generate an ID
-        name: _nameController.text,
-        description: _descriptionController.text,
-        address: _addressController.text,
-        openingTime: _openingTimeController.text,
-        closingTime: _closingTimeController.text,
-        website: _websiteController.text,
-        phone: _phoneController.text,
-        email: _emailController.text,
-        isEmergencyAvailable: _isEmergencyAvailable,
-        imagePath: '',
-      );
+      try {
+        final vetData = VetModel(
+          name: _nameController.text,
+          specialization: _specializationController.text,
+          experience: _experienceController.text,
+          location: _locationController.text,
+          about: _aboutController.text,
+          phoneNumber: _phoneController.text,
+          email: _emailController.text,
+          website: _websiteController.text,
+          openingTime: _openingTimeController.text,
+          closingTime: _closingTimeController.text,
+          imagePath: _imagePath,
+          isEmergencyAvailable: _isEmergencyAvailable,
+        );
 
-      _saveToFirestore(newVet);
-      widget.onSave(newVet);
-      Navigator.pop(context);
+        await FirebaseFirestore.instance
+            .collection('vets')
+            .add(vetData.toJson());
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Vet profile added successfully')),
+        );
+        Navigator.pop(context);
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error adding vet: $e')),
+        );
+      }
     }
   }
 
@@ -153,12 +140,12 @@ class _AddVetPageState extends State<AddVetPage> {
               ),
               const SizedBox(height: 16),
               TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(labelText: 'Description'),
+                controller: _aboutController,
+                decoration: const InputDecoration(labelText: 'About'),
                 maxLines: 3,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter a description';
+                    return 'Please enter about information';
                   }
                   return null;
                 },
@@ -174,17 +161,37 @@ class _AddVetPageState extends State<AddVetPage> {
                 },
               ),
               TextFormField(
-                controller: _addressController,
-                decoration: const InputDecoration(labelText: 'Address'),
+                controller: _specializationController,
+                decoration: const InputDecoration(labelText: 'Specialization'),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter an address';
+                    return 'Please enter a specialization';
                   }
                   return null;
                 },
               ),
               TextFormField(
-                controller: _websiteController, // Website field
+                controller: _experienceController,
+                decoration: const InputDecoration(labelText: 'Experience'),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter experience';
+                  }
+                  return null;
+                },
+              ),
+              TextFormField(
+                controller: _locationController,
+                decoration: const InputDecoration(labelText: 'Location'),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter a location';
+                  }
+                  return null;
+                },
+              ),
+              TextFormField(
+                controller: _websiteController,
                 decoration: const InputDecoration(labelText: 'Website'),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -194,7 +201,7 @@ class _AddVetPageState extends State<AddVetPage> {
                 },
               ),
               TextFormField(
-                controller: _phoneController, // Phone number field
+                controller: _phoneController,
                 decoration: const InputDecoration(labelText: 'Phone Number'),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -204,7 +211,7 @@ class _AddVetPageState extends State<AddVetPage> {
                 },
               ),
               TextFormField(
-                controller: _emailController, // Email field
+                controller: _emailController,
                 decoration: const InputDecoration(labelText: 'Email'),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -213,16 +220,10 @@ class _AddVetPageState extends State<AddVetPage> {
                   return null;
                 },
               ),
-              TextFormField(
-                controller: _feeController, // New fee field
-                decoration: const InputDecoration(labelText: 'Fee'),
-                keyboardType: TextInputType.number,
-              ),
               const SizedBox(height: 16),
               const Text(
                 'Available Time Slots:',
-                style:
-                    TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               Wrap(
                 spacing: 8,
@@ -248,7 +249,7 @@ class _AddVetPageState extends State<AddVetPage> {
               ),
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: _submitForm,
+                onPressed: _saveVet,
                 child: Text(widget.vet == null ? 'Add Vet' : 'Save Changes'),
               ),
             ],

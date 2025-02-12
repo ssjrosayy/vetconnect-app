@@ -5,6 +5,7 @@ import 'homepage.dart';
 import 'home_page_for_pets.dart';
 import 'vet_connect_painter.dart';
 import 'auth_services.dart'; // Import the AuthService class
+import 'vet_model.dart'; // Add this import
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -29,40 +30,65 @@ class _LoginPageState extends State<LoginPage> {
           _passwordController.text.trim(),
         );
         if (user != null) {
-          FirebaseFirestore.instance
+          final userDoc = await FirebaseFirestore.instance
               .collection('users')
               .doc(user.uid)
-              .get()
-              .then(
-            (currentUserData) {
-              print(
-                currentUserData.data()?['role'],
+              .get();
+
+          if (!userDoc.exists) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('User data not found')),
+            );
+            return;
+          }
+
+          final userData = userDoc.data()!;
+          final String userType = userData['role'];
+
+          if (userType == 'VET') {
+            // Fetch vet data
+            final vetDoc = await FirebaseFirestore.instance
+                .collection('vets')
+                .doc(user.uid)
+                .get();
+
+            if (!vetDoc.exists) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Vet profile not found')),
               );
-              final String userType = currentUserData.data()?['role'];
-              //Check UserType & When UserType is VET
-              if (userType == 'VET') {
-                //Go To Home Page of VET
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (BuildContext context) => HomePage(),
-                  ),
-                );
-              }
-              //Check UserType & When UserType is PET
-              else {
-                //Go To HomePage Of PET
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (BuildContext context) => HomePageForPets(),
-                  ),
-                );
-              }
-            },
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Login failed. Please try again.')),
-          );
+              return;
+            }
+
+            final vetData = vetDoc.data()!;
+            final currentVet = VetModel(
+              id: user.uid,
+              name: vetData['name'] ?? '',
+              specialization: vetData['specialization'] ?? '',
+              experience: vetData['experience'] ?? '',
+              location: vetData['location'] ?? '',
+              about: vetData['about'] ?? '',
+              phoneNumber: vetData['phoneNumber'] ?? '',
+              email: vetData['email'] ?? '',
+              website: vetData['website'] ?? '',
+              openingTime: vetData['openingTime'] ?? '',
+              closingTime: vetData['closingTime'] ?? '',
+              imagePath: vetData['imagePath'] ?? '',
+              isEmergencyAvailable: vetData['isEmergencyAvailable'] ?? false,
+            );
+
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (BuildContext context) =>
+                    HomePage(currentVet: currentVet),
+              ),
+            );
+          } else {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (BuildContext context) => const HomePageForPets(),
+              ),
+            );
+          }
         }
       } on FirebaseAuthException catch (e) {
         String errorMessage;

@@ -3,246 +3,268 @@ import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:vet_connect/homepage.dart';
 import 'package:vet_connect/home_page_for_pets.dart';
 import 'auth_services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'vet_model.dart';
 
-class SignupPage extends StatefulWidget {
-  const SignupPage({super.key});
+class SignUpPage extends StatefulWidget {
+  const SignUpPage({Key? key}) : super(key: key);
 
   @override
-  _SignupPageState createState() => _SignupPageState();
+  _SignUpPageState createState() => _SignUpPageState();
 }
 
-class _SignupPageState extends State<SignupPage> {
-  final signUpFormKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
+class _SignUpPageState extends State<SignUpPage> {
+  final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
-  String? _selectedRole;
-  bool _passwordVisible = false;
-  String? _phoneError;
+  final _nameController = TextEditingController();
+  String _selectedRole = 'PET_OWNER';
+  bool _isLoading = false;
 
-  final AuthService _authService = AuthService(); // Instance of AuthService
+  // Additional controllers for vet registration
+  final _specializationController = TextEditingController();
+  final _experienceController = TextEditingController();
+  final _locationController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _websiteController = TextEditingController();
+  final _openingTimeController = TextEditingController();
+  final _closingTimeController = TextEditingController();
 
-  @override
-  void dispose() {
-    _usernameController.dispose();
-    _emailController.dispose();
-    _phoneController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
-  // Validation Functions
-  String? _validateUsername(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Please enter a username';
-    } else if (value.length < 3) {
-      return 'Username must be at least 3 characters long';
-    } else if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(value)) {
-      return 'Username can only contain alphanumeric characters and underscores';
-    }
-    return null;
-  }
-
-  String? _validateEmail(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Please enter your email';
-    } else if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
-      return 'Please enter a valid email address';
-    }
-    return null;
-  }
-
-  String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Please enter a password';
-    } else if (value.length < 8) {
-      return 'Password must be at least 8 characters long';
-    } else if (!RegExp(r'[A-Z]').hasMatch(value)) {
-      return 'Password must contain at least one uppercase letter';
-    } else if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(value)) {
-      return 'Password must contain at least one special character';
-    }
-    return null;
-  }
-
-  void _validatePhone() {
-    if (_phoneController.text.isEmpty) {
-      setState(() {
-        _phoneError = 'Please enter your phone number';
-      });
-    } else {
-      setState(() {
-        _phoneError = null;
-      });
-    }
-  }
+  // Additional controllers for pet owner registration
+  final _petNameController = TextEditingController();
+  final _petTypeController = TextEditingController();
+  final _petBreedController = TextEditingController();
+  final _petAgeController = TextEditingController();
 
   Future<void> _signUp() async {
-    _validatePhone();
+    if (_formKey.currentState!.validate()) {
+      setState(() => _isLoading = true);
 
-    if (signUpFormKey.currentState!.validate() &&
-        _phoneError == null &&
-        _selectedRole != null) {
       try {
-        // Use AuthService to handle signup
-        String result = await _authService.signUpUser(
-          name: _usernameController.text.trim(),
+        // Create user account
+        final userCredential =
+            await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
-          role: _selectedRole!,
         );
 
-        if (result == "User created successfully.") {
-          // Navigate to the appropriate home page based on user type
-          if (_selectedRole == 'Vet') {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const HomePage()),
-            );
-          } else if (_selectedRole == 'Pet') {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const HomePageForPets()),
-            );
-          }
+        // Save user role
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userCredential.user!.uid)
+            .set({
+          'role': _selectedRole,
+          'email': _emailController.text.trim(),
+          'name': _nameController.text.trim(),
+        });
+
+        if (_selectedRole == 'VET') {
+          // Create vet profile
+          final vetModel = VetModel(
+            id: userCredential.user!.uid,
+            name: _nameController.text.trim(),
+            specialization: _specializationController.text.trim(),
+            experience: _experienceController.text.trim(),
+            location: _locationController.text.trim(),
+            phoneNumber: _phoneController.text.trim(),
+            email: _emailController.text.trim(),
+            website: _websiteController.text.trim(),
+            openingTime: _openingTimeController.text.trim(),
+            closingTime: _closingTimeController.text.trim(),
+            about: '',
+            imagePath: '',
+            isEmergencyAvailable: false,
+          );
+
+          await FirebaseFirestore.instance
+              .collection('vets')
+              .doc(userCredential.user!.uid)
+              .set(vetModel.toJson());
+
+          if (!mounted) return;
+          // Navigate to vet homepage
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+                builder: (context) => HomePage(currentVet: vetModel)),
+          );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(result)),
+          // For pet owners, create their initial profile
+          await FirebaseFirestore.instance
+              .collection('pet_owners')
+              .doc(userCredential.user!.uid)
+              .set({
+            'name': _nameController.text.trim(),
+            'email': _emailController.text.trim(),
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+
+          if (!mounted) return;
+          // Navigate to pet owner homepage
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const HomePageForPets()),
           );
         }
-      } catch (e) {
+      } on FirebaseAuthException catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error during signup: ${e.toString()}')),
+          SnackBar(content: Text(e.message ?? 'An error occurred')),
         );
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
       }
-    } else if (_selectedRole == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a role (Vet or Pet)')),
-      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Signup Page'),
-      ),
+      appBar: AppBar(title: const Text('Sign Up')),
       body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
         child: Form(
-          key: signUpFormKey,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Create an account',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
+          key: _formKey,
+          child: Column(
+            children: [
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(labelText: 'Name'),
+                validator: (value) =>
+                    value?.isEmpty ?? true ? 'Please enter your name' : null,
+              ),
+              TextFormField(
+                controller: _emailController,
+                decoration: const InputDecoration(labelText: 'Email'),
+                validator: (value) =>
+                    value?.isEmpty ?? true ? 'Please enter an email' : null,
+              ),
+              TextFormField(
+                controller: _passwordController,
+                decoration: const InputDecoration(labelText: 'Password'),
+                obscureText: true,
+                validator: (value) =>
+                    value?.isEmpty ?? true ? 'Please enter a password' : null,
+              ),
+              DropdownButtonFormField<String>(
+                value: _selectedRole,
+                decoration: const InputDecoration(labelText: 'Role'),
+                items: const [
+                  DropdownMenuItem(
+                      value: 'PET_OWNER', child: Text('Pet Owner')),
+                  DropdownMenuItem(value: 'VET', child: Text('Veterinarian')),
+                ],
+                onChanged: (String? value) {
+                  setState(() => _selectedRole = value!);
+                },
+              ),
+              if (_selectedRole == 'VET') ...[
                 TextFormField(
-                  controller: _usernameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Enter Your Username',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: _validateUsername,
+                  controller: _specializationController,
+                  decoration:
+                      const InputDecoration(labelText: 'Specialization'),
+                  validator: (value) =>
+                      value?.isEmpty ?? true ? 'Required' : null,
                 ),
-                const SizedBox(height: 16),
                 TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Enter Your Email',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: _validateEmail,
+                  controller: _experienceController,
+                  decoration: const InputDecoration(labelText: 'Experience'),
+                  validator: (value) =>
+                      value?.isEmpty ?? true ? 'Required' : null,
                 ),
-                const SizedBox(height: 16),
-                IntlPhoneField(
+                TextFormField(
+                  controller: _locationController,
+                  decoration: const InputDecoration(labelText: 'Location'),
+                  validator: (value) =>
+                      value?.isEmpty ?? true ? 'Required' : null,
+                ),
+                TextFormField(
                   controller: _phoneController,
-                  decoration: const InputDecoration(
-                    labelText: 'Enter Your Phone Number',
-                    border: OutlineInputBorder(),
-                  ),
-                  initialCountryCode: 'US',
-                  onChanged: (phone) {
-                    _validatePhone();
-                  },
+                  decoration: const InputDecoration(labelText: 'Phone Number'),
+                  validator: (value) =>
+                      value?.isEmpty ?? true ? 'Required' : null,
                 ),
-                if (_phoneError != null)
-                  Text(_phoneError!, style: const TextStyle(color: Colors.red)),
-                const SizedBox(height: 16),
                 TextFormField(
-                  controller: _passwordController,
-                  obscureText: !_passwordVisible,
-                  decoration: InputDecoration(
-                    labelText: 'Enter Your Password',
-                    border: const OutlineInputBorder(),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _passwordVisible
-                            ? Icons.visibility
-                            : Icons.visibility_off,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _passwordVisible = !_passwordVisible;
-                        });
-                      },
-                    ),
-                  ),
-                  validator: _validatePassword,
+                  controller: _websiteController,
+                  decoration:
+                      const InputDecoration(labelText: 'Website (Optional)'),
                 ),
-                const SizedBox(height: 16),
-                const Text('Sign up as:'),
-                RadioListTile<String>(
-                  title: const Text('Vet'),
-                  value: 'Vet',
-                  groupValue: _selectedRole,
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedRole = value;
-                    });
-                  },
+                TextFormField(
+                  controller: _openingTimeController,
+                  decoration: const InputDecoration(labelText: 'Opening Time'),
+                  validator: (value) =>
+                      value?.isEmpty ?? true ? 'Required' : null,
                 ),
-                RadioListTile<String>(
-                  title: const Text('Pet'),
-                  value: 'Pet',
-                  groupValue: _selectedRole,
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedRole = value;
-                    });
-                  },
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: _signUp,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    minimumSize: const Size(double.infinity, 50),
-                  ),
-                  child: const Text('Sign Up'),
-                ),
-                const SizedBox(height: 16),
-                Center(
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/login');
-                    },
-                    child: const Text('Already have an account? Login'),
-                  ),
+                TextFormField(
+                  controller: _closingTimeController,
+                  decoration: const InputDecoration(labelText: 'Closing Time'),
+                  validator: (value) =>
+                      value?.isEmpty ?? true ? 'Required' : null,
                 ),
               ],
-            ),
+              if (_selectedRole == 'PET_OWNER') ...[
+                TextFormField(
+                  controller: _petNameController,
+                  decoration: const InputDecoration(labelText: 'Pet Name'),
+                  validator: (value) =>
+                      value?.isEmpty ?? true ? 'Please enter pet name' : null,
+                ),
+                DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(labelText: 'Pet Type'),
+                  items: const [
+                    DropdownMenuItem(value: 'Dog', child: Text('Dog')),
+                    DropdownMenuItem(value: 'Cat', child: Text('Cat')),
+                    DropdownMenuItem(value: 'Bird', child: Text('Bird')),
+                    DropdownMenuItem(value: 'Other', child: Text('Other')),
+                  ],
+                  onChanged: (value) => _petTypeController.text = value ?? '',
+                  validator: (value) =>
+                      value == null ? 'Please select pet type' : null,
+                ),
+                TextFormField(
+                  controller: _petBreedController,
+                  decoration: const InputDecoration(labelText: 'Pet Breed'),
+                  validator: (value) =>
+                      value?.isEmpty ?? true ? 'Please enter pet breed' : null,
+                ),
+                TextFormField(
+                  controller: _petAgeController,
+                  decoration: const InputDecoration(labelText: 'Pet Age'),
+                  keyboardType: TextInputType.number,
+                  validator: (value) =>
+                      value?.isEmpty ?? true ? 'Please enter pet age' : null,
+                ),
+              ],
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _isLoading ? null : _signUp,
+                child: _isLoading
+                    ? const CircularProgressIndicator()
+                    : const Text('Sign Up'),
+              ),
+            ],
           ),
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _nameController.dispose();
+    _specializationController.dispose();
+    _experienceController.dispose();
+    _locationController.dispose();
+    _phoneController.dispose();
+    _websiteController.dispose();
+    _openingTimeController.dispose();
+    _closingTimeController.dispose();
+    _petNameController.dispose();
+    _petTypeController.dispose();
+    _petBreedController.dispose();
+    _petAgeController.dispose();
+    super.dispose();
   }
 }

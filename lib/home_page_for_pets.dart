@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:vet_connect/drawer.dart';
-import 'PetListPage.dart';
+import 'package:vet_connect/PetListPage.dart';
 import 'appointment_schedules.dart';
 import 'online_consultation.dart';
 import 'emergency.dart';
-import 'vet_profile_page.dart'; // Import the VetProfilePage
+import 'vet_profile_page.dart';
 import 'vet_model.dart';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class HomePageForPets extends StatefulWidget {
   const HomePageForPets({super.key});
@@ -16,204 +18,203 @@ class HomePageForPets extends StatefulWidget {
 }
 
 class _HomePageForPetsState extends State<HomePageForPets> {
-  List<VetModel> vets = [];
-
-  void _updateVet(int index, VetModel updatedVet) {
-    setState(() {
-      vets[index] = updatedVet;
-    });
-  }
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   @override
   Widget build(BuildContext context) {
+    final user = _auth.currentUser;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('VetConnect'),
+        title: const Text('Pet Owner Dashboard'),
       ),
       drawer: MyDrawer(
-        email: "user@example.com", // Replace with dynamic data
-        profileImageUrl: "https://www.example.com/profile.jpg",
-        onLogout: () {}, // Replace with dynamic data
+        email: user?.email ?? 'No email',
+        profileImageUrl: user?.photoURL ?? 'https://placeholder.com/user',
+        onLogout: () async {
+          await _auth.signOut();
+          Navigator.of(context).pushReplacementNamed('/login');
+        },
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
+      body: GridView.count(
+        padding: const EdgeInsets.all(20),
+        crossAxisCount: 2,
         children: [
-          Container(
-            padding: const EdgeInsets.all(16.0),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.purple.shade100, Colors.orange.shade100],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+          _buildMenuCard(
+            'My Pets',
+            Icons.pets,
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const PetListPage()),
+            ),
+          ),
+          _buildMenuCard(
+            'Available Vets',
+            Icons.medical_services,
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => StreamBuilder<QuerySnapshot>(
+                  stream:
+                      FirebaseFirestore.instance.collection('vets').snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return const Center(child: Text('Something went wrong'));
+                    }
+
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    return Scaffold(
+                      appBar: AppBar(title: const Text('Available Vets')),
+                      body: ListView.builder(
+                        itemCount: snapshot.data!.docs.length,
+                        itemBuilder: (context, index) {
+                          final vetData = snapshot.data!.docs[index].data()
+                              as Map<String, dynamic>;
+                          final vet = VetModel(
+                            id: snapshot.data!.docs[index].id,
+                            name: vetData['name'] ?? '',
+                            specialization: vetData['specialization'] ?? '',
+                            experience: vetData['experience'] ?? '',
+                            location: vetData['location'] ?? '',
+                            about: vetData['about'] ?? '',
+                            phoneNumber: vetData['phoneNumber'] ?? '',
+                            email: vetData['email'] ?? '',
+                            website: vetData['website'] ?? '',
+                            openingTime: vetData['openingTime'] ?? '',
+                            closingTime: vetData['closingTime'] ?? '',
+                            imagePath: vetData['imagePath'] ?? '',
+                            isEmergencyAvailable:
+                                vetData['isEmergencyAvailable'] ?? false,
+                          );
+
+                          return ListTile(
+                            leading:
+                                const CircleAvatar(child: Icon(Icons.person)),
+                            title: Text(vet.name),
+                            subtitle: Text(vet.specialization),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => VetProfilePage(
+                                    vet: vet,
+                                    onUpdate: (VetModel vet) async {
+                                      // Refresh the vet list
+                                      setState(() {});
+                                      Navigator.pop(context);
+                                    },
+                                    onBookAppointment: () {
+                                      showDatePicker(
+                                        context: context,
+                                        initialDate: DateTime.now(),
+                                        firstDate: DateTime.now(),
+                                        lastDate: DateTime.now()
+                                            .add(const Duration(days: 365)),
+                                      ).then((selectedDate) async {
+                                        if (selectedDate != null) {
+                                          try {
+                                            await FirebaseFirestore.instance
+                                                .collection('appointments')
+                                                .add({
+                                              'vetId': vet.id,
+                                              'petOwnerId':
+                                                  _auth.currentUser?.uid,
+                                              'date': selectedDate,
+                                              'status': 'pending',
+                                              'createdAt':
+                                                  FieldValue.serverTimestamp(),
+                                            });
+
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              const SnackBar(
+                                                  content: Text(
+                                                      'Appointment request sent')),
+                                            );
+                                            Navigator.pop(context);
+                                          } catch (e) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                  content: Text('Error: $e')),
+                                            );
+                                          }
+                                        }
+                                      });
+                                    },
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
               ),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Text(
-              'Take care of pet\'s health\nyour pet is important',
-              style: TextStyle(color: Colors.black, fontSize: 16),
             ),
           ),
-          const SizedBox(height: 16),
-          const Text(
-            'Category',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildCategoryButton(
-                  context,
-                  Icons.schedule,
-                  'appointment\nschedules',
-                  const AppointmentSchedulesPage(),
-                ),
-                const SizedBox(width: 10),
-                _buildCategoryButton(
-                  context,
-                  Icons.chat,
-                  'online\nconsultation',
-                  const OnlineConsultationPage(),
-                ),
-                const SizedBox(width: 10),
-                _buildCategoryButton(
-                  context,
-                  Icons.pets,
-                  'pet\nprofiles',
-                  const PetListPage(), // Navigate to the PetListPage
-                ),
-                const SizedBox(width: 10),
-                _buildCategoryButton(
-                  context,
-                  Icons.local_hospital,
-                  'emergency \nservices',
-                  const EmergencyPage(),
-                ),
-              ],
+          _buildMenuCard(
+            'Appointments',
+            Icons.calendar_today,
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (context) =>
+                      const AppointmentSchedulesPage()), // Changed from AppointmentSchedules
             ),
           ),
-          const SizedBox(height: 16),
-          const Text(
-            'Veterinary',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 0.75,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
+          _buildMenuCard(
+            'Online Consultation',
+            Icons.video_call,
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (context) => const OnlineConsultationPage()),
             ),
-            itemCount: vets.length,
-            itemBuilder: (context, index) {
-              return _buildVeterinaryCard(context, vets[index], index);
-            },
+          ),
+          _buildMenuCard(
+            'Emergency',
+            Icons.emergency,
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const EmergencyPage()),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCategoryButton(
-      BuildContext context, IconData icon, String label, Widget page) {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            icon: Icon(icon),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => page),
-              );
-            },
-            iconSize: 50,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 12),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVeterinaryCard(BuildContext context, VetModel vet, int index) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => VetProfilePage(
-              vet: vet,
-              onUpdate: (updatedVet) => _updateVet(index, updatedVet), onBookAppointment: () {  },
+  Widget _buildMenuCard(String title, IconData icon, VoidCallback onTap) {
+    return Card(
+      elevation: 4,
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 50,
+              color: Theme.of(context).primaryColor,
             ),
-          ),
-        );
-      },
-      child: Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        elevation: 4,
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.purple.shade100, Colors.purple.shade200],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
             ),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Column(
-            children: [
-              ClipOval(
-                child:
-                    vet.imagePath.isNotEmpty && File(vet.imagePath).existsSync()
-                        ? Image.file(
-                            File(vet.imagePath),
-                            width: 80,
-                            height: 80,
-                            fit: BoxFit.cover,
-                          )
-                        : Image.asset(
-                            'assets/default_vet_image.png',
-                            width: 80,
-                            height: 80,
-                            fit: BoxFit.cover,
-                          ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Dr. ${vet.name}',
-                style:
-                    const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.location_on, size: 16),
-                  const SizedBox(width: 4),
-                  Text(
-                    vet.address,
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                ],
-              ),
-            ],
-          ),
+          ],
         ),
       ),
     );
   }
-} 
+}

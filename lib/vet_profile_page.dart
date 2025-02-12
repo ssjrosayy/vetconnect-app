@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'vet_model.dart';
 import 'add_vet_page.dart';
@@ -7,168 +9,149 @@ import 'add_vet_page.dart';
 class VetProfilePage extends StatelessWidget {
   final VetModel vet;
   final Function(VetModel) onUpdate;
+  final VoidCallback onBookAppointment;
 
-  const VetProfilePage({super.key, 
+  const VetProfilePage({
+    Key? key,
     required this.vet,
-    required this.onUpdate, required Null Function() onBookAppointment,
-  });
+    required this.onUpdate,
+    required this.onBookAppointment,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Vet Profile'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => AddVetPage(
-                    onSave: (updatedVet) {
-                      onUpdate(updatedVet);
-                      Navigator.pop(context);
-                    },
-                    vet: vet,
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
+        title: Text('Dr. ${vet.name}'),
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
-        child: ListView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child:
-                  vet.imagePath.isNotEmpty && File(vet.imagePath).existsSync()
-                      ? Image.file(
-                          File(vet.imagePath),
-                          height: 300,
-                          width: 400,
-                          fit: BoxFit.cover,
-                        )
-                      : Image.asset(
-                          'assets/default_vet_image.png',
-                          height: 200,
-                          width: 200,
-                          fit: BoxFit.cover,
-                        ),
-            ),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(8.0),
-              decoration: BoxDecoration(
-                border:
-                    Border.all(color: const Color.fromARGB(255, 255, 254, 254)),
-                borderRadius: BorderRadius.circular(6.0),
+            if (vet.imagePath.isNotEmpty)
+              Center(
+                child: Image.network(
+                  vet.imagePath,
+                  height: 200,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
               ),
-              child: Text(
-                'Dr. ${vet.name}',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            const SizedBox(height: 16),
+            _buildInfoSection('Specialization', vet.specialization),
+            _buildInfoSection('Experience', vet.experience),
+            _buildInfoSection('Location', vet.location),
+            _buildInfoSection('About', vet.about),
+            _buildInfoSection('Contact', vet.phoneNumber),
+            _buildInfoSection('Email', vet.email),
+            _buildInfoSection('Website', vet.website),
+            _buildInfoSection(
+                'Working Hours', '${vet.openingTime} - ${vet.closingTime}'),
+            const SizedBox(height: 16),
+            if (vet.isEmergencyAvailable)
+              const Chip(
+                label: Text('Emergency Available'),
+                backgroundColor: Colors.red,
+                labelStyle: TextStyle(color: Colors.white),
               ),
-            ),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(8.0),
-              decoration: BoxDecoration(
-                border: Border.all(color: const Color.fromARGB(255, 251, 251, 251)),
-                borderRadius: BorderRadius.circular(6.0),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.location_on),
-                  const SizedBox(width: 8.0),
-                  Text(
-                    vet.address,
-                    style: const TextStyle(fontSize: 18),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(8.0),
-              decoration: BoxDecoration(
-                border:
-                    Border.all(color: const Color.fromARGB(255, 255, 252, 252)),
-                borderRadius: BorderRadius.circular(6.0),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.access_time),
-                  const SizedBox(width: 8.0),
-                  Text(
-                    'Opens at ${vet.openingTime}',
-                    style: const TextStyle(fontSize: 18),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(8.0),
-              decoration: BoxDecoration(
-                border:
-                    Border.all(color: const Color.fromARGB(255, 255, 253, 253)),
-                borderRadius: BorderRadius.circular(6.0),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.web),
-                  const SizedBox(width: 8.0),
-                  Expanded(
-                    child: Text(
-                      vet.website,
-                      style: const TextStyle(fontSize: 18),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () async {
+                  // First get available slots
+                  final slotsDoc = await FirebaseFirestore.instance
+                      .collection('vets')
+                      .doc(vet.id)
+                      .collection('slots')
+                      .doc('schedule')
+                      .get();
+
+                  if (!slotsDoc.exists) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('No available slots')),
+                    );
+                    return;
+                  }
+
+                  final slots = slotsDoc.data()?['slots'] as List<dynamic>;
+
+                  // Show slot selection dialog
+                  final selectedSlot = await showDialog<String>(
+                    context: context,
+                    builder: (context) => SimpleDialog(
+                      title: const Text('Select Time Slot'),
+                      children: slots.map<SimpleDialogOption>((slot) {
+                        return SimpleDialogOption(
+                          onPressed: () => Navigator.pop(context, slot),
+                          child: Text(slot),
+                        );
+                      }).toList(),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(8.0),
-              decoration: BoxDecoration(
-                border:
-                    Border.all(color: const Color.fromARGB(255, 255, 255, 255)),
-                borderRadius: BorderRadius.circular(6.0),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.phone),
-                  const SizedBox(width: 8.0),
-                  Text(
-                    vet.phone,
-                    style: const TextStyle(fontSize: 18),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(8.0),
-              decoration: BoxDecoration(
-                border:
-                    Border.all(color: const Color.fromARGB(255, 255, 255, 255)),
-                borderRadius: BorderRadius.circular(6.0),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.email),
-                  const SizedBox(width: 8.0),
-                  Text(
-                    vet.email,
-                    style: const TextStyle(fontSize: 18),
-                  ),
-                ],
+                  );
+
+                  if (selectedSlot != null) {
+                    final selectedDate = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 30)),
+                    );
+
+                    if (selectedDate != null) {
+                      try {
+                        await FirebaseFirestore.instance
+                            .collection('appointments')
+                            .add({
+                          'vetId': vet.id,
+                          'vetName': vet.name,
+                          'petOwnerId': FirebaseAuth.instance.currentUser?.uid,
+                          'ownerName':
+                              FirebaseAuth.instance.currentUser?.displayName,
+                          'date': selectedDate,
+                          'slot': selectedSlot,
+                          'status': 'pending',
+                          'createdAt': FieldValue.serverTimestamp(),
+                        });
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Appointment request sent')),
+                        );
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error: $e')),
+                        );
+                      }
+                    }
+                  }
+                },
+                child: const Text('Book Appointment'),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildInfoSection(String title, String content) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(content),
+        ],
       ),
     );
   }

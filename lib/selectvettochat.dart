@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'chatscreen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'screens/chat_screen.dart';
 
-class SelectVetToChatPage extends StatelessWidget {
+class SelectVetToChatPage extends StatefulWidget {
   const SelectVetToChatPage({super.key});
 
   @override
+  State<SelectVetToChatPage> createState() => _SelectVetToChatPageState();
+}
+
+class _SelectVetToChatPageState extends State<SelectVetToChatPage> {
+  @override
   Widget build(BuildContext context) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Select Vet to Chat"),
@@ -14,7 +22,7 @@ class SelectVetToChatPage extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('appointments')
-            .where('userId', isEqualTo: 'currentUserId') // Replace with actual user ID
+            .where('petOwnerId', isEqualTo: currentUser?.uid)
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -30,19 +38,49 @@ class SelectVetToChatPage extends StatelessWidget {
           return ListView.builder(
             itemCount: vets.length,
             itemBuilder: (context, index) {
-              final vetData = vets[index];
-              final vetName = vetData['vetName'];
-              final vetId = vetData['vetId'];
+              final vetData = vets[index].data() as Map<String, dynamic>;
+              final vetName = vetData['vetName'] as String;
+              final vetId = vetData['vetId'] as String;
 
               return ListTile(
                 title: Text(vetName),
-                onTap: () {
+                onTap: () async {
+                  // Create or get existing chat document
+                  final chatDoc = await FirebaseFirestore.instance
+                      .collection('chats')
+                      .where('vetId', isEqualTo: vetId)
+                      .where('petOwnerId', isEqualTo: currentUser?.uid)
+                      .get();
+
+                  String chatId;
+                  if (chatDoc.docs.isEmpty) {
+                    final newChatRef = await FirebaseFirestore.instance
+                        .collection('chats')
+                        .add({
+                      'vetId': vetId,
+                      'petOwnerId': currentUser?.uid,
+                      'vetName': vetName,
+                      'petOwnerName': currentUser?.displayName ?? 'Pet Owner',
+                      'createdAt': FieldValue.serverTimestamp(),
+                      'lastMessage': '',
+                      'lastMessageTime': FieldValue.serverTimestamp(),
+                    });
+                    chatId = newChatRef.id;
+                  } else {
+                    chatId = chatDoc.docs.first.id;
+                  }
+
+                  if (!mounted) return;
+
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => ChatScreen(
-                        vetId: vetId,
-                        vetName: vetName,
+                        chatId: chatId,
+                        senderId: currentUser?.uid ?? '',
+                        receiverId: vetId,
+                        senderName: currentUser?.displayName ?? 'Pet Owner',
+                        receiverName: vetName,
                       ),
                     ),
                   );

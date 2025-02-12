@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'details_of_the_vet.dart';
 
 class AppointmentSchedulesPage extends StatelessWidget {
@@ -12,37 +13,45 @@ class AppointmentSchedulesPage extends StatelessWidget {
         title: const Text('Appointment Schedules'),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('vets').snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection('appointments')
+            .where('petOwnerId',
+                isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+            .orderBy('date')
+            .snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text("No vets found"));
+          final appointments = snapshot.data!.docs;
+
+          if (appointments.isEmpty) {
+            return const Center(child: Text('No appointments yet'));
           }
 
-          final vets = snapshot.data!.docs;
-
           return ListView.builder(
-            itemCount: vets.length,
+            itemCount: appointments.length,
             itemBuilder: (context, index) {
-              final vet = vets[index];
-              final vetName = vet['name'];
-              final vetDescription = vet['description'];
+              final appointment =
+                  appointments[index].data() as Map<String, dynamic>;
+              final date = (appointment['date'] as Timestamp).toDate();
 
-              return ListTile(
-                title: Text(vetName),
-                subtitle: Text(vetDescription),
-                leading: const Icon(Icons.person),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => DetailsOfTheVetPage(vetId: vet.id),
-                    ),
-                  );
-                },
+              return Card(
+                margin: const EdgeInsets.all(8),
+                child: ListTile(
+                  title: Text('Dr. ${appointment['vetName']}'),
+                  subtitle: Text('Date: ${date.toString().split(' ')[0]}\n'
+                      'Time: ${appointment['slot']}\n'
+                      'Status: ${appointment['status']}'),
+                  trailing: appointment['status'] == 'pending'
+                      ? const Chip(label: Text('Pending'))
+                      : null,
+                ),
               );
             },
           );

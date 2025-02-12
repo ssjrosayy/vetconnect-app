@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Ensure users can only access their data
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+    
+    // Vet profiles
+    match /vets/{vetId} {
+      allow read: if true;  // Allow anyone to read vet profiles
+      allow write: if request.auth != null && request.auth.uid == vetId;
+    }
+    
+    // Appointments
+    match /appointments/{appointmentId} {
+      allow read: if request.auth != null && 
+        (resource.data.vetId == request.auth.uid || 
+         resource.data.petOwnerId == request.auth.uid);
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && 
+        (resource.data.vetId == request.auth.uid || 
+         resource.data.petOwnerId == request.auth.uid);
+      allow delete: if false;
+    }
+    
+    // Pet profiles
+    match /pets/{petId} {
+      allow read: if true;
+      allow create, update: if request.auth != null && 
+        request.auth.uid == request.resource.data.ownerId;
+      allow delete: if request.auth != null && 
+        request.auth.uid == resource.data.ownerId;
+    }
+    
+    // Medical records
+    match /medical_records/{recordId} {
+      allow read: if request.auth != null && 
+        (resource.data.vetId == request.auth.uid || 
+         resource.data.petOwnerId == request.auth.uid);
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.vetId;
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.vetId;
+      allow delete: if false;
+    }
+    
+    match /chats/{userId}/{vetId}/{messageId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
+

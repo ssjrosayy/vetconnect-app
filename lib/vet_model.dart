@@ -1,41 +1,47 @@
 class VetModel {
-  String id; // Add an ID to the model
+  String id;
   String name;
-  String description;
-  String address;
-  String openingTime;
-  String website;
-  String phone;
+  String specialization;
+  String experience;
+  String location;
+  String about;
+  String phoneNumber;
   String email;
-  String imagePath; 
+  String website;
+  String imagePath;
+  String openingTime;
+  String closingTime;
   bool isEmergencyAvailable;
 
   VetModel({
-    this.id = '', // Default to an empty ID if not provided
+    this.id = '',
     required this.name,
-    required this.description,
-    required this.address,
-    required this.openingTime,
-    required this.website,
-    required this.phone,
+    required this.specialization,
+    required this.experience,
+    required this.location,
+    this.about = '',
+    required this.phoneNumber,
     required this.email,
-    required this.imagePath,
-    required this.isEmergencyAvailable,
-    required String closingTime,
+    required this.website,
+    this.imagePath = '',
+    required this.openingTime,
+    required this.closingTime,
+    this.isEmergencyAvailable = false,
   });
-
-  get closingTime => null;
 
   Map<String, dynamic> toJson() {
     return {
       'name': name,
-      'description': description,
-      'address': address,
-      'openingTime': openingTime,
-      'website': website,
-      'phone': phone,
+      'specialization': specialization,
+      'experience': experience,
+      'location': location,
+      'about': about,
+      'phoneNumber': phoneNumber,
       'email': email,
+      'website': website,
       'imagePath': imagePath,
+      'openingTime': openingTime,
+      'closingTime': closingTime,
       'isEmergencyAvailable': isEmergencyAvailable,
     };
   }
@@ -44,15 +50,17 @@ class VetModel {
     return VetModel(
       id: json['id'] ?? '',
       name: json['name'] ?? '',
-      description: json['description'] ?? '',
-      address: json['address'] ?? '',
-      openingTime: json['openingTime'] ?? '',
-      website: json['website'] ?? '',
-      phone: json['phone'] ?? '',
+      specialization: json['specialization'] ?? '',
+      experience: json['experience'] ?? '',
+      location: json['location'] ?? '',
+      about: json['about'] ?? '',
+      phoneNumber: json['phoneNumber'] ?? '',
       email: json['email'] ?? '',
+      website: json['website'] ?? '',
       imagePath: json['imagePath'] ?? '',
+      openingTime: json['openingTime'] ?? '',
+      closingTime: json['closingTime'] ?? '',
       isEmergencyAvailable: json['isEmergencyAvailable'] ?? false,
-      closingTime: '',
     );
   }
 }

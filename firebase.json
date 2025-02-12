@@ -1,1 +1,26 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"vetconnect-5a6ba","appId":"1:589201624295:android:3fa15fb3026b7706f72642","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"vetconnect-5a6ba","configurations":{"android":"1:589201624295:android:3fa15fb3026b7706f72642","ios":"1:589201624295:ios:4e1b2aa264f7f05af72642"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "vetconnect-5a6ba",
+          "appId": "1:589201624295:android:3fa15fb3026b7706f72642",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "vetconnect-5a6ba",
+          "configurations": {
+            "android": "1:589201624295:android:3fa15fb3026b7706f72642",
+            "ios": "1:589201624295:ios:4e1b2aa264f7f05af72642"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}
