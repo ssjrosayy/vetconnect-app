@@ -26,9 +26,12 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Pet chatbot messages - Temporarily more permissive for testing
+    // Pet chatbot messages
     match /pet_chatbot_messages/{messageId} {
-      allow read, write: if request.auth != null;
+      allow create: if request.auth != null 
+        && request.resource.data.keys().hasAll(['content', 'userId', 'isUserMessage', 'timestamp', 'createdAt']);
+      
+      allow read: if request.auth != null;
     }
 
     // Ensure users can only access their data
@@ -40,7 +43,7 @@ service cloud.firestore {
     // Vet profiles
     match /vets/{vetId} {
       allow read: if true;
-      allow write, update: if request.auth != null && request.auth.uid == vetId;
+      allow write: if isAuthenticated() && request.auth.uid == vetId;
       
       // Allow vets to manage their time slots
       match /slots/{document=**} {
@@ -51,21 +54,18 @@ service cloud.firestore {
     
     // Appointments
     match /appointments/{appointmentId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && 
+        (isOwner(resource.data.petOwnerId) || resource.data.vetId == request.auth.uid);
       allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && (
-        isOwner(resource.data.vetId) || 
-        isOwner(resource.data.petOwnerId)
-      );
+      allow update: if isAuthenticated() && 
+        (isOwner(resource.data.petOwnerId) || resource.data.vetId == request.auth.uid);
+      allow delete: if false;  // Prevent deletions - maintain appointment history
     }
     
     // Pet profiles
     match /pets/{petId} {
-      allow read: if true;
-      allow create, update: if request.auth != null && 
-        request.auth.uid == request.resource.data.ownerId;
-      allow delete: if request.auth != null && 
-        request.auth.uid == resource.data.ownerId;
+      allow read: if isAuthenticated() && isOwner(resource.data.uid);
+      allow write: if isAuthenticated() && isOwner(request.resource.data.uid);
     }
     
     // Medical records
@@ -80,8 +80,24 @@ service cloud.firestore {
       allow delete: if false;
     }
     
+    // Chats
     match /chats/{chatId} {
-      allow read, write: if request.auth != null;
+      allow create: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+        resource.data.vetId == request.auth.uid || 
+        resource.data.petOwnerId == request.auth.uid
+      );
+      
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() && (
+          get(/databases/$(database)/documents/chats/$(chatId)).data.vetId == request.auth.uid ||
+          get(/databases/$(database)/documents/chats/$(chatId)).data.petOwnerId == request.auth.uid
+        );
+        allow create: if isAuthenticated() && (
+          get(/databases/$(database)/documents/chats/$(chatId)).data.vetId == request.auth.uid ||
+          get(/databases/$(database)/documents/chats/$(chatId)).data.petOwnerId == request.auth.uid
+        );
+      }
     }
 
     // Chatbot messages
@@ -95,6 +111,12 @@ service cloud.firestore {
       
       allow read: if request.auth != null 
         && resource.data.userId == request.auth.uid;
+    }
+
+    // Vet availability rules
+    match /vet_availability/{vetId} {
+      allow read: if true;  // Public read access
+      allow write: if isAuthenticated() && request.auth.uid == vetId;
     }
   }
 }

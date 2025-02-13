@@ -25,10 +25,10 @@ class _MakeAppointmentWithVetPageState
   List<String> workingDays = [];
   int appointmentDuration = 30; // in minutes
   DateTime? selectedDate;
-  TimeOfDay? selectedTime;
+  String? selectedTime;
   String vetName = '';
   double vetFee = 0.0;
-  List<TimeOfDay> availableSlots = [];
+  List<String> availableSlots = [];
   String? selectedPetId;
   List<Map<String, dynamic>> userPets = [];
 
@@ -99,7 +99,7 @@ class _MakeAppointmentWithVetPageState
         TimeOfDay(
           hour: currentMinutes ~/ 60,
           minute: currentMinutes % 60,
-        ),
+        ).format(context),
       );
       currentMinutes += appointmentDuration;
     }
@@ -134,56 +134,58 @@ class _MakeAppointmentWithVetPageState
     }
   }
 
-  Future<void> _selectDate() async {
+  Future<void> _loadAvailableSlots(String dayOfWeek) async {
+    try {
+      final vetDoc = await FirebaseFirestore.instance
+          .collection('vets')
+          .doc(widget.vetId)
+          .get();
+
+      if (vetDoc.exists && vetDoc.data()!.containsKey('availableSlots')) {
+        final slots = vetDoc.data()!['availableSlots'] as Map<String, dynamic>;
+        if (slots.containsKey(dayOfWeek)) {
+          setState(() {
+            availableSlots = List<String>.from(slots[dayOfWeek]);
+            availableSlots.sort(); // Sort slots chronologically
+          });
+        } else {
+          setState(() {
+            availableSlots = [];
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading slots: $e');
+    }
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
       firstDate: DateTime.now(),
-      lastDate: DateTime(DateTime.now().year + 1),
-      selectableDayPredicate: (DateTime date) {
-        // Only allow dates on working days
-        return workingDays.contains(_getDayName(date));
-      },
+      lastDate: DateTime.now().add(const Duration(days: 30)),
     );
-    if (picked != null && picked != selectedDate) {
+
+    if (picked != null) {
       setState(() {
         selectedDate = picked;
+        selectedTime = null;
       });
-      _checkBookedSlots();
+
+      // Get day of week and load available slots
+      String dayOfWeek = [
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+        'Sunday'
+      ][picked.weekday - 1];
+
+      await _loadAvailableSlots(dayOfWeek);
     }
-  }
-
-  Future<void> _checkBookedSlots() async {
-    if (selectedDate == null) return;
-
-    final bookedAppointments = await FirebaseFirestore.instance
-        .collection('appointments')
-        .where('vetId', isEqualTo: widget.vetId)
-        .where('date',
-            isGreaterThanOrEqualTo: DateTime(
-              selectedDate!.year,
-              selectedDate!.month,
-              selectedDate!.day,
-            ))
-        .where('date',
-            isLessThan: DateTime(
-              selectedDate!.year,
-              selectedDate!.month,
-              selectedDate!.day + 1,
-            ))
-        .get();
-
-    final bookedTimes = bookedAppointments.docs.map((doc) {
-      final date = (doc.data()['date'] as Timestamp).toDate();
-      return TimeOfDay(hour: date.hour, minute: date.minute);
-    }).toList();
-
-    setState(() {
-      availableSlots = availableSlots.where((slot) {
-        return !bookedTimes.any((bookedTime) =>
-            bookedTime.hour == slot.hour && bookedTime.minute == slot.minute);
-      }).toList();
-    });
   }
 
   Future<void> _confirmAppointment() async {
@@ -198,8 +200,8 @@ class _MakeAppointmentWithVetPageState
       selectedDate!.year,
       selectedDate!.month,
       selectedDate!.day,
-      selectedTime!.hour,
-      selectedTime!.minute,
+      _parseTimeString(selectedTime!).hour,
+      _parseTimeString(selectedTime!).minute,
     );
 
     try {
@@ -241,9 +243,9 @@ class _MakeAppointmentWithVetPageState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Make Appointment'),
+        title: const Text('Book Appointment'),
       ),
-      body: SingleChildScrollView(
+      body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -269,34 +271,66 @@ class _MakeAppointmentWithVetPageState
                   setState(() => selectedPetId = value);
                 },
               ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             ElevatedButton(
-              onPressed: _selectDate,
+              onPressed: () => _selectDate(context),
               child: Text(selectedDate == null
                   ? 'Select Date'
-                  : 'Date: ${selectedDate!.toString().split(' ')[0]}'),
+                  : 'Date: ${selectedDate!.toLocal().toString().split(' ')[0]}'),
             ),
-            if (selectedDate != null && availableSlots.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              const Text('Available Time Slots:'),
-              Wrap(
-                spacing: 8,
-                children: availableSlots.map((slot) {
-                  return ElevatedButton(
-                    onPressed: () {
-                      setState(() => selectedTime = slot);
-                      _confirmAppointment();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: selectedTime == slot
-                          ? Theme.of(context).primaryColor
-                          : null,
+            const SizedBox(height: 20),
+            if (selectedDate != null && availableSlots.isNotEmpty)
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Available Time Slots:',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    child: Text(slot.format(context)),
-                  );
-                }).toList(),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: GridView.builder(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          childAspectRatio: 2.5,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                        ),
+                        itemCount: availableSlots.length,
+                        itemBuilder: (context, index) {
+                          return ElevatedButton(
+                            onPressed: () {
+                              setState(() {
+                                selectedTime = availableSlots[index];
+                              });
+                              // Proceed with booking
+                              if (selectedTime != null) {
+                                _confirmAppointment();
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor:
+                                  selectedTime == availableSlots[index]
+                                      ? Theme.of(context).primaryColor
+                                      : null,
+                            ),
+                            child: Text(availableSlots[index]),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else if (selectedDate != null)
+              const Center(
+                child: Text('No available slots for selected date'),
               ),
-            ],
           ],
         ),
       ),

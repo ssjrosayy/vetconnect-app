@@ -120,6 +120,9 @@ class _PetChatbotScreenState extends State<PetChatbotScreen> {
       debugPrint('Saving message to Firestore...');
       debugPrint('Collection: $_collectionPath');
       debugPrint('UserId: $userId');
+      debugPrint(
+          'Auth state: ${_auth.currentUser != null ? 'Authenticated' : 'Not authenticated'}');
+      debugPrint('Current user ID: ${_auth.currentUser?.uid}');
 
       final messageData = {
         'content': content,
@@ -130,11 +133,22 @@ class _PetChatbotScreenState extends State<PetChatbotScreen> {
       };
       debugPrint('Message data: $messageData');
 
-      await _firestore.collection(_collectionPath).add(messageData);
-      debugPrint('Message saved successfully');
-    } catch (e) {
+      // Verify authentication before saving
+      if (_auth.currentUser == null) {
+        throw Exception('User not authenticated');
+      }
+
+      if (_auth.currentUser!.uid != userId) {
+        throw Exception('User ID mismatch');
+      }
+
+      final docRef =
+          await _firestore.collection(_collectionPath).add(messageData);
+      debugPrint('Message saved successfully with ID: ${docRef.id}');
+    } catch (e, stackTrace) {
       debugPrint('Error saving message: $e');
-      throw Exception('Failed to save message');
+      debugPrint('Stack trace: $stackTrace');
+      throw Exception('Failed to save message: $e');
     }
   }
 
