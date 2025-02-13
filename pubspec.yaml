@@ -45,10 +45,14 @@ dependencies:
   flutter_local_notifications: ^18.0.1
   timezone: ^0.10.0
   image_picker: ^1.1.2
-  record: ^5.2.0  # or the latest version
-  path_provider: ^2.0.8
-  audioplayers: ^6.1.2 
+  record: ^5.2.0
+  path_provider: ^2.1.5
+  audioplayers: ^6.1.2
   intl: ^0.20.2
+  tflite_flutter: ^0.11.0
+  image: ^4.5.2
+  google_fonts: ^6.1.0
+  http: ^1.2.0
   
 
 dev_dependencies:
@@ -75,7 +79,18 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  ## - assets/default_vet_image.png
+  assets:
+    - assets/models/
+    - assets/models/breed_model.tflite
+    - assets/models/breed_metadata.json
+    - assets/models/skin_disease_model.tflite
+    - assets/models/skin_disease_metadata.json
+    - assets/models/symptoms_metadata.json
+    - assets/models/symptoms_dog_model.tflite
+    - assets/models/symptoms_cat_model.tflite
+    - assets/models/symptom_label_mapping.json
+    - assets/models/symptom_model.tflite
+    - assets/models/symptom_model_info.json
 
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg

@@ -1,17 +1,18 @@
 class VetModel {
-  String id;
-  String name;
-  String specialization;
-  String experience;
-  String location;
-  String about;
-  String phoneNumber;
-  String email;
-  String website;
-  String imagePath;
-  String openingTime;
-  String closingTime;
-  bool isEmergencyAvailable;
+  final String id;
+  final String name;
+  final String specialization;
+  final String experience;
+  final String location;
+  final String about;
+  final String phoneNumber;
+  final String email;
+  final String website;
+  final String openingTime;
+  final String closingTime;
+  final String imagePath;
+  final bool isEmergencyAvailable;
+  final Map<String, Map<String, bool>> availableSlots;
 
   VetModel({
     this.id = '',
@@ -19,17 +20,18 @@ class VetModel {
     required this.specialization,
     required this.experience,
     required this.location,
-    this.about = '',
+    required this.about,
     required this.phoneNumber,
     required this.email,
     required this.website,
-    this.imagePath = '',
     required this.openingTime,
     required this.closingTime,
-    this.isEmergencyAvailable = false,
+    required this.imagePath,
+    required this.isEmergencyAvailable,
+    this.availableSlots = const {},
   });
 
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toMap() {
     return {
       'name': name,
       'specialization': specialization,
@@ -39,28 +41,41 @@ class VetModel {
       'phoneNumber': phoneNumber,
       'email': email,
       'website': website,
-      'imagePath': imagePath,
       'openingTime': openingTime,
       'closingTime': closingTime,
+      'imagePath': imagePath,
       'isEmergencyAvailable': isEmergencyAvailable,
+      'availableSlots': availableSlots,
     };
   }
 
-  factory VetModel.fromJson(Map<String, dynamic> json) {
+  // Alias for toMap() for backward compatibility
+  Map<String, dynamic> toJson() => toMap();
+
+  factory VetModel.fromMap(String id, Map<String, dynamic> map) {
     return VetModel(
-      id: json['id'] ?? '',
-      name: json['name'] ?? '',
-      specialization: json['specialization'] ?? '',
-      experience: json['experience'] ?? '',
-      location: json['location'] ?? '',
-      about: json['about'] ?? '',
-      phoneNumber: json['phoneNumber'] ?? '',
-      email: json['email'] ?? '',
-      website: json['website'] ?? '',
-      imagePath: json['imagePath'] ?? '',
-      openingTime: json['openingTime'] ?? '',
-      closingTime: json['closingTime'] ?? '',
-      isEmergencyAvailable: json['isEmergencyAvailable'] ?? false,
+      id: id,
+      name: map['name'] ?? '',
+      specialization: map['specialization'] ?? '',
+      experience: map['experience'] ?? '',
+      location: map['location'] ?? '',
+      about: map['about'] ?? '',
+      phoneNumber: map['phoneNumber'] ?? '',
+      email: map['email'] ?? '',
+      website: map['website'] ?? '',
+      openingTime: map['openingTime'] ?? '',
+      closingTime: map['closingTime'] ?? '',
+      imagePath: map['imagePath'] ?? '',
+      isEmergencyAvailable: map['isEmergencyAvailable'] ?? false,
+      availableSlots: (map['availableSlots'] as Map<String, dynamic>?)?.map(
+            (key, value) => MapEntry(
+              key,
+              (value as Map<String, dynamic>).map(
+                (k, v) => MapEntry(k, v as bool),
+              ),
+            ),
+          ) ??
+          {},
     );
   }
 }

@@ -1,27 +1,62 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user is a vet
+    function isVet() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'VET';
+    }
+    
+    // Helper function to check if user is a pet owner
+    function isPetOwner() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'PET_OWNER';
+    }
+    
+    // Helper function to check if user is the owner of the document
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // User chat sessions - Updated rules for chatbot
+    match /user_chats/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Pet chatbot messages - Temporarily more permissive for testing
+    match /pet_chatbot_messages/{messageId} {
+      allow read, write: if request.auth != null;
+    }
+
     // Ensure users can only access their data
     match /users/{userId} {
-      allow read, write: if true;
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
     }
     
     // Vet profiles
     match /vets/{vetId} {
-      allow read: if true;  // Allow anyone to read vet profiles
-      allow write: if request.auth != null && request.auth.uid == vetId;
+      allow read: if true;
+      allow write, update: if request.auth != null && request.auth.uid == vetId;
+      
+      // Allow vets to manage their time slots
+      match /slots/{document=**} {
+        allow read: if true;
+        allow write, update: if request.auth != null && request.auth.uid == vetId;
+      }
     }
     
     // Appointments
     match /appointments/{appointmentId} {
-      allow read: if request.auth != null && 
-        (resource.data.vetId == request.auth.uid || 
-         resource.data.petOwnerId == request.auth.uid);
-      allow create: if request.auth != null;
-      allow update: if request.auth != null && 
-        (resource.data.vetId == request.auth.uid || 
-         resource.data.petOwnerId == request.auth.uid);
-      allow delete: if false;
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && (
+        isOwner(resource.data.vetId) || 
+        isOwner(resource.data.petOwnerId)
+      );
     }
     
     // Pet profiles
@@ -45,12 +80,21 @@ service cloud.firestore {
       allow delete: if false;
     }
     
-    match /chats/{userId}/{vetId}/{messageId} {
+    match /chats/{chatId} {
       allow read, write: if request.auth != null;
     }
-    
-    match /{document=**} {
-      allow read, write: if true;
+
+    // Chatbot messages
+    match /chatbot_messages/{messageId} {
+      allow create: if request.auth != null 
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasAll(['content', 'userId', 'isUserMessage', 'timestamp', 'createdAt'])
+        && request.resource.data.content is string
+        && request.resource.data.userId is string
+        && request.resource.data.isUserMessage is bool;
+      
+      allow read: if request.auth != null 
+        && resource.data.userId == request.auth.uid;
     }
   }
 }

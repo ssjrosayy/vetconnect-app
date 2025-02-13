@@ -1,0 +1,201 @@
+{
+  "animals": [
+    "dog",
+    "cat"
+  ],
+  "symptoms": {
+    "dog": [
+      "fever",
+      "lethargy",
+      "vomiting",
+      "diarrhea",
+      "coughing",
+      "sneezing",
+      "loss_of_appetite",
+      "difficulty_breathing",
+      "lameness",
+      "skin_issues",
+      "excessive_thirst",
+      "seizures",
+      "itching",
+      "limping",
+      "swelling",
+      "eye_discharge",
+      "ear_infection",
+      "excessive_drooling",
+      "bleeding",
+      "anxiety",
+      "aggression",
+      "weight_gain",
+      "weight_loss",
+      "increased_urination",
+      "joint_pain",
+      "hair_loss"
+    ],
+    "cat": [
+      "fever",
+      "lethargy",
+      "vomiting",
+      "diarrhea",
+      "sneezing",
+      "loss_of_appetite",
+      "difficulty_breathing",
+      "urinary_issues",
+      "hair_loss",
+      "behavioral_changes",
+      "weight_loss",
+      "excessive_grooming",
+      "itching",
+      "eye_discharge",
+      "ear_infection",
+      "limping",
+      "swelling",
+      "bleeding",
+      "increased_vocalization",
+      "hiding",
+      "aggression",
+      "excessive_thirst",
+      "constipation",
+      "dental_issues",
+      "skin_lesions"
+    ]
+  },
+  "diseases": {
+    "dog": [
+      {
+        "name": "Canine Parvovirus",
+        "risk": "CRITICAL",
+        "symptoms": [
+          "vomiting",
+          "diarrhea",
+          "lethargy",
+          "fever",
+          "loss_of_appetite"
+        ]
+      },
+      {
+        "name": "Kennel Cough",
+        "risk": "MEDIUM",
+        "symptoms": [
+          "coughing",
+          "sneezing",
+          "eye_discharge",
+          "lethargy",
+          "loss_of_appetite"
+        ]
+      },
+      {
+        "name": "Hip Dysplasia",
+        "risk": "HIGH",
+        "symptoms": [
+          "lameness",
+          "limping",
+          "joint_pain",
+          "difficulty_breathing",
+          "lethargy"
+        ]
+      },
+      {
+        "name": "Diabetes",
+        "risk": "HIGH",
+        "symptoms": [
+          "excessive_thirst",
+          "increased_urination",
+          "weight_loss",
+          "lethargy",
+          "loss_of_appetite"
+        ]
+      },
+      {
+        "name": "Ear Infection",
+        "risk": "MEDIUM",
+        "symptoms": [
+          "ear_infection",
+          "itching",
+          "swelling",
+          "behavioral_changes",
+          "lethargy"
+        ]
+      },
+      {
+        "name": "Canine Anxiety",
+        "risk": "MEDIUM",
+        "symptoms": [
+          "anxiety",
+          "excessive_drooling",
+          "behavioral_changes",
+          "aggression",
+          "hiding"
+        ]
+      }
+    ],
+    "cat": [
+      {
+        "name": "Feline Upper Respiratory Infection",
+        "risk": "MEDIUM",
+        "symptoms": [
+          "sneezing",
+          "eye_discharge",
+          "fever",
+          "lethargy",
+          "loss_of_appetite"
+        ]
+      },
+      {
+        "name": "Feline Urinary Tract Disease",
+        "risk": "HIGH",
+        "symptoms": [
+          "urinary_issues",
+          "lethargy",
+          "behavioral_changes",
+          "increased_vocalization",
+          "hiding"
+        ]
+      },
+      {
+        "name": "Feline Diabetes",
+        "risk": "HIGH",
+        "symptoms": [
+          "excessive_thirst",
+          "increased_urination",
+          "weight_loss",
+          "lethargy",
+          "loss_of_appetite"
+        ]
+      },
+      {
+        "name": "Dental Disease",
+        "risk": "MEDIUM",
+        "symptoms": [
+          "dental_issues",
+          "loss_of_appetite",
+          "excessive_drooling",
+          "behavioral_changes",
+          "weight_loss"
+        ]
+      },
+      {
+        "name": "Feline Allergic Dermatitis",
+        "risk": "MEDIUM",
+        "symptoms": [
+          "itching",
+          "skin_lesions",
+          "excessive_grooming",
+          "hair_loss",
+          "behavioral_changes"
+        ]
+      },
+      {
+        "name": "Feline Infectious Peritonitis",
+        "risk": "CRITICAL",
+        "symptoms": [
+          "fever",
+          "lethargy",
+          "loss_of_appetite",
+          "difficulty_breathing",
+          "swelling"
+        ]
+      }
+    ]
+  }
+}

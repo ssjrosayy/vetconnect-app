@@ -1,0 +1,129 @@
+# Code Citations
+
+## License: unknown
+https://github.com/xlmtvv/animal_classifier/blob/f4aa0d349770fd889ec71f98b2197d506dbc3d05/classifier_app/models.py
+
+```
+:
+    base_model = M
+```
+
+
+## License: unknown
+https://github.com/xlmtvv/animal_classifier/blob/f4aa0d349770fd889ec71f98b2197d506dbc3d05/classifier_app/models.py
+
+```
+:
+    base_model = MobileNetV2(
+        input_shape=(224
+```
+
+
+## License: unknown
+https://github.com/xlmtvv/animal_classifier/blob/f4aa0d349770fd889ec71f98b2197d506dbc3d05/classifier_app/models.py
+
+```
+:
+    base_model = MobileNetV2(
+        input_shape=(224, 224, 3),
+        include_top=False
+```
+
+
+## License: unknown
+https://github.com/xlmtvv/animal_classifier/blob/f4aa0d349770fd889ec71f98b2197d506dbc3d05/classifier_app/models.py
+
+```
+:
+    base_model = MobileNetV2(
+        input_shape=(224, 224, 3),
+        include_top=False,
+        weights='imagenet'
+    )
+```
+
+
+## License: unknown
+https://github.com/xlmtvv/animal_classifier/blob/f4aa0d349770fd889ec71f98b2197d506dbc3d05/classifier_app/models.py
+
+```
+:
+    base_model = MobileNetV2(
+        input_shape=(224, 224, 3),
+        include_top=False,
+        weights='imagenet'
+    )
+    base_model.trainable = False
+```
+
+
+## License: unknown
+https://github.com/xlmtvv/animal_classifier/blob/f4aa0d349770fd889ec71f98b2197d506dbc3d05/classifier_app/models.py
+
+```
+:
+    base_model = MobileNetV2(
+        input_shape=(224, 224, 3),
+        include_top=False,
+        weights='imagenet'
+    )
+    base_model.trainable = False
+    
+    model = tf.keras
+```
+
+
+## License: unknown
+https://github.com/xlmtvv/animal_classifier/blob/f4aa0d349770fd889ec71f98b2197d506dbc3d05/classifier_app/models.py
+
+```
+:
+    base_model = MobileNetV2(
+        input_shape=(224, 224, 3),
+        include_top=False,
+        weights='imagenet'
+    )
+    base_model.trainable = False
+    
+    model = tf.keras.Sequential([
+        base_model,
+        tf
+```
+
+
+## License: unknown
+https://github.com/xlmtvv/animal_classifier/blob/f4aa0d349770fd889ec71f98b2197d506dbc3d05/classifier_app/models.py
+
+```
+:
+    base_model = MobileNetV2(
+        input_shape=(224, 224, 3),
+        include_top=False,
+        weights='imagenet'
+    )
+    base_model.trainable = False
+    
+    model = tf.keras.Sequential([
+        base_model,
+        tf.keras.layers.GlobalAveragePool
+```
+
+
+## License: unknown
+https://github.com/xlmtvv/animal_classifier/blob/f4aa0d349770fd889ec71f98b2197d506dbc3d05/classifier_app/models.py
+
+```
+:
+    base_model = MobileNetV2(
+        input_shape=(224, 224, 3),
+        include_top=False,
+        weights='imagenet'
+    )
+    base_model.trainable = False
+    
+    model = tf.keras.Sequential([
+        base_model,
+        tf.keras.layers.GlobalAveragePooling2D(),
+        tf.keras.
+```
+

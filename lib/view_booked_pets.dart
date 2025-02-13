@@ -52,7 +52,8 @@ class ViewBookedPetPage extends StatelessWidget {
                 const SizedBox(height: 20),
                 Text(
                   "Name: ${pet['name']}",
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 10),
                 Text(

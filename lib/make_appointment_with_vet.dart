@@ -1,70 +1,137 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';  // Add this line
-import 'package:vet_connect/payments_options.dart';
-import 'screens/chat_screen.dart';
-import 'services/notification_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import 'payments_options.dart';
+// ...existing imports...
 
 class MakeAppointmentWithVetPage extends StatefulWidget {
   final String vetId;
 
-  const MakeAppointmentWithVetPage({super.key, required this.vetId});
+  const MakeAppointmentWithVetPage({Key? key, required this.vetId})
+      : super(key: key);
 
   @override
-  _MakeAppointmentWithVetPageState createState() =>
+  State<MakeAppointmentWithVetPage> createState() =>
       _MakeAppointmentWithVetPageState();
 }
 
 class _MakeAppointmentWithVetPageState
     extends State<MakeAppointmentWithVetPage> {
+  // ...existing variables...
+  bool is24x7 = false;
+  String? startTime;
+  String? endTime;
+  List<String> workingDays = [];
+  int appointmentDuration = 30; // in minutes
   DateTime? selectedDate;
   TimeOfDay? selectedTime;
   String vetName = '';
-  int vetFee = 1000; // Hardcoded fee
+  double vetFee = 0.0;
   List<TimeOfDay> availableSlots = [];
-  String appointmentId = '';
+  String? selectedPetId;
+  List<Map<String, dynamic>> userPets = [];
 
   @override
   void initState() {
     super.initState();
     _fetchVetDetails();
-    _generateTimeSlots();
+    _fetchUserPets();
   }
 
   Future<void> _fetchVetDetails() async {
-    try {
-      final vetDoc = await FirebaseFirestore.instance
-          .collection('vets')
-          .doc(widget.vetId)
+    final vetDoc = await FirebaseFirestore.instance
+        .collection('vets')
+        .doc(widget.vetId)
+        .get();
+
+    final availabilityDoc = await FirebaseFirestore.instance
+        .collection('vet_availability')
+        .doc(widget.vetId)
+        .get();
+
+    if (availabilityDoc.exists) {
+      final data = availabilityDoc.data()!;
+      setState(() {
+        is24x7 = data['is24x7'] ?? false;
+        startTime = data['startTime'];
+        endTime = data['endTime'];
+        workingDays = List<String>.from(data['workingDays'] ?? []);
+        appointmentDuration = data['appointmentDuration'] ?? 30;
+        vetName = vetDoc['name'];
+        _generateTimeSlots();
+      });
+    }
+  }
+
+  Future<void> _fetchUserPets() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId != null) {
+      final petsSnapshot = await FirebaseFirestore.instance
+          .collection('pets')
+          .where('uid', isEqualTo: userId)
           .get();
 
-      if (!vetDoc.exists) {
-        throw Exception('Vet not found');
-      }
-
       setState(() {
-        vetName = vetDoc.data()?['name'] ?? 'Unknown Vet';
+        userPets = petsSnapshot.docs
+            .map((doc) => {...doc.data() as Map<String, dynamic>, 'id': doc.id})
+            .toList();
       });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching vet details: $e')),
-      );
     }
   }
 
   void _generateTimeSlots() {
-    // Hardcoded time slots with 1-hour intervals, excluding 2:00 PM and 7:00 PM
-    availableSlots = [
-      const TimeOfDay(hour: 10, minute: 0),
-      const TimeOfDay(hour: 11, minute: 0),
-      const TimeOfDay(hour: 12, minute: 0),
-      const TimeOfDay(hour: 13, minute: 0),
-      const TimeOfDay(hour: 15, minute: 0),
-      const TimeOfDay(hour: 16, minute: 0),
-      const TimeOfDay(hour: 17, minute: 0),
-      const TimeOfDay(hour: 18, minute: 0),
-    ];
+    availableSlots = [];
+    if (!is24x7 && (startTime == null || endTime == null)) return;
+
+    final start = is24x7
+        ? const TimeOfDay(hour: 0, minute: 0)
+        : _parseTimeString(startTime!);
+    final end = is24x7
+        ? const TimeOfDay(hour: 23, minute: 59)
+        : _parseTimeString(endTime!);
+
+    int currentMinutes = start.hour * 60 + start.minute;
+    final endMinutes = end.hour * 60 + end.minute;
+
+    while (currentMinutes + appointmentDuration <= endMinutes) {
+      availableSlots.add(
+        TimeOfDay(
+          hour: currentMinutes ~/ 60,
+          minute: currentMinutes % 60,
+        ),
+      );
+      currentMinutes += appointmentDuration;
+    }
+  }
+
+  TimeOfDay _parseTimeString(String time) {
+    final parts = time.split(':');
+    return TimeOfDay(
+      hour: int.parse(parts[0]),
+      minute: int.parse(parts[1]),
+    );
+  }
+
+  String _getDayName(DateTime date) {
+    switch (date.weekday) {
+      case 1:
+        return 'Monday';
+      case 2:
+        return 'Tuesday';
+      case 3:
+        return 'Wednesday';
+      case 4:
+        return 'Thursday';
+      case 5:
+        return 'Friday';
+      case 6:
+        return 'Saturday';
+      case 7:
+        return 'Sunday';
+      default:
+        return '';
+    }
   }
 
   Future<void> _selectDate() async {
@@ -73,214 +140,99 @@ class _MakeAppointmentWithVetPageState
       initialDate: DateTime.now(),
       firstDate: DateTime.now(),
       lastDate: DateTime(DateTime.now().year + 1),
+      selectableDayPredicate: (DateTime date) {
+        // Only allow dates on working days
+        return workingDays.contains(_getDayName(date));
+      },
     );
     if (picked != null && picked != selectedDate) {
       setState(() {
         selectedDate = picked;
       });
+      _checkBookedSlots();
     }
   }
 
+  Future<void> _checkBookedSlots() async {
+    if (selectedDate == null) return;
+
+    final bookedAppointments = await FirebaseFirestore.instance
+        .collection('appointments')
+        .where('vetId', isEqualTo: widget.vetId)
+        .where('date',
+            isGreaterThanOrEqualTo: DateTime(
+              selectedDate!.year,
+              selectedDate!.month,
+              selectedDate!.day,
+            ))
+        .where('date',
+            isLessThan: DateTime(
+              selectedDate!.year,
+              selectedDate!.month,
+              selectedDate!.day + 1,
+            ))
+        .get();
+
+    final bookedTimes = bookedAppointments.docs.map((doc) {
+      final date = (doc.data()['date'] as Timestamp).toDate();
+      return TimeOfDay(hour: date.hour, minute: date.minute);
+    }).toList();
+
+    setState(() {
+      availableSlots = availableSlots.where((slot) {
+        return !bookedTimes.any((bookedTime) =>
+            bookedTime.hour == slot.hour && bookedTime.minute == slot.minute);
+      }).toList();
+    });
+  }
+
   Future<void> _confirmAppointment() async {
-    if (selectedTime == null || selectedDate == null) {
+    if (selectedTime == null || selectedDate == null || selectedPetId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select both date and time')),
+        const SnackBar(content: Text('Please select a pet, date and time')),
       );
       return;
     }
 
-    try {
-      final selectedDateTime = DateTime(
-        selectedDate!.year,
-        selectedDate!.month,
-        selectedDate!.day,
-        selectedTime!.hour,
-        selectedTime!.minute,
-      );
+    final selectedDateTime = DateTime(
+      selectedDate!.year,
+      selectedDate!.month,
+      selectedDate!.day,
+      selectedTime!.hour,
+      selectedTime!.minute,
+    );
 
-      // Check if the selected time is in the past
-      if (selectedDateTime.isBefore(DateTime.now())) {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cannot book appointment in the past')),
+          const SnackBar(content: Text('Please login to book appointment')),
         );
         return;
       }
 
-      // Save the appointment data in Firestore
-      final appointmentRef =
-          await FirebaseFirestore.instance.collection('appointments').add({
+      // Create appointment
+      await FirebaseFirestore.instance.collection('appointments').add({
         'vetId': widget.vetId,
         'vetName': vetName,
-        'date': selectedDateTime,
-        'time': selectedTime!.format(context),
-        'fee': vetFee,
-        'status': 'scheduled',
-        'createdAt': DateTime.now(),
-      });
-
-      appointmentId = appointmentRef.id;
-
-      // Schedule reminder notification
-      await NotificationService.scheduleAppointmentReminder(
-        appointmentRef.id.hashCode,
-        'Appointment Reminder',
-        'You have an appointment with Dr. $vetName in 1 hour',
-        selectedDateTime,
-      );
-
-      // Navigate to the Payment Options Page
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PaymentOptionsPage(
-            vetName: vetName,
-            dateTime: selectedDateTime,
-            fee: vetFee,
-            vetId: widget.vetId,
-            petOwnerEmail: '',
-          ),
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error creating appointment: $e')),
-      );
-    }
-  }
-
-  Future<void> _cancelAppointment() async {
-    if (appointmentId.isEmpty) return;
-
-    await FirebaseFirestore.instance
-        .collection('appointments')
-        .doc(appointmentId)
-        .update({'status': 'cancelled'});
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Appointment cancelled successfully')),
-    );
-
-    Navigator.pop(context);
-  }
-
-  Future<void> _showTimeSlots(BuildContext context, DateTime selectedDate) async {
-    final doc = await FirebaseFirestore.instance
-        .collection('vets')
-        .doc(widget.vetId)
-        .collection('slots')
-        .doc('weekly_schedule')
-        .get();
-
-    if (!doc.exists) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No available slots found')),
-      );
-      return;
-    }
-
-    final data = doc.data() as Map<String, dynamic>;
-    final daySlots = Map<String, bool>.from(
-      data[DateFormat('EEEE').format(selectedDate)] ?? {},
-    );
-
-    // Check which slots are already booked
-    final bookedSlots = await FirebaseFirestore.instance
-        .collection('appointments')
-        .where('vetId', isEqualTo: widget.vetId)
-        .where('date', isEqualTo: Timestamp.fromDate(selectedDate))
-        .get();
-
-    for (var doc in bookedSlots.docs) {
-      final appointmentData = doc.data();
-      daySlots[appointmentData['slot']] = false;
-    }
-
-    if (!mounted) return;
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Available Slots for ${DateFormat('EEEE, MMM d').format(selectedDate)}'),
-        content: SingleChildScrollView(
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: daySlots.entries.map((entry) {
-              return FilterChip(
-                label: Text(entry.key),
-                selected: entry.value,
-                onSelected: entry.value
-                    ? (bool selected) async {
-                        Navigator.pop(context);
-                        // Book the appointment
-                        await _bookAppointment(selectedDate, entry.key);
-                      }
-                    : null,
-                backgroundColor: entry.value ? null : Colors.grey,
-              );
-            }).toList(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _bookAppointment(DateTime date, String slot) async {
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please login to book an appointment')),
-      );
-      return;
-    }
-
-    try {
-      // Create appointment document
-      final appointmentRef = await FirebaseFirestore.instance.collection('appointments').add({
-        'vetId': widget.vetId,
-        'vetName': vetName,
+        'petId': selectedPetId,
         'petOwnerId': currentUser.uid,
-        'petOwnerName': currentUser.displayName ?? 'Pet Owner',
-        'date': date,
-        'slot': slot,
-        'fee': vetFee,
+        'ownerName': currentUser.displayName,
+        'appointmentDate': selectedDateTime,
         'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
+        'fee': vetFee,
       });
 
-      appointmentId = appointmentRef.id;
-
-      // Schedule notification
-      await NotificationService.scheduleAppointmentReminder(
-        appointmentRef.id.hashCode,
-        'Appointment Reminder',
-        'You have an appointment with Dr. $vetName in 1 hour',
-        date,
-      );
-
-      // Navigate to payment options
       if (!mounted) return;
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PaymentOptionsPage(
-            vetName: vetName,
-            dateTime: date,
-            fee: vetFee,
-            vetId: widget.vetId,
-            petOwnerEmail: currentUser.email ?? '',
-          ),
-        ),
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Appointment request sent')),
       );
+      Navigator.pop(context);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error booking appointment: $e')),
+        SnackBar(content: Text('Error: $e')),
       );
     }
   }
@@ -289,123 +241,62 @@ class _MakeAppointmentWithVetPageState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Make Appointment"),
-        actions: [
-          if (appointmentId.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.cancel),
-              onPressed: _cancelAppointment,
-              tooltip: 'Cancel Appointment',
-            ),
-          FutureBuilder<QuerySnapshot>(
-            future: FirebaseFirestore.instance
-                .collection('appointments')
-                .where('vetId', isEqualTo: widget.vetId)
-                .where('status', isEqualTo: 'completed')
-                .limit(1)
-                .get(),
-            builder: (context, snapshot) {
-              if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-                return IconButton(
-                  icon: const Icon(Icons.chat),
-                  onPressed: () async {
-                    final currentUser = FirebaseAuth.instance.currentUser;
-                    if (currentUser == null) return;
-
-                    // Get vet details
-                    final vetDoc = await FirebaseFirestore.instance
-                        .collection('vets')
-                        .doc(widget.vetId)
-                        .get();
-
-                    final vetData = vetDoc.data() as Map<String, dynamic>;
-                    final vetName = vetData['name'] as String;
-
-                    // Create or get existing chat document
-                    final chatDoc = await FirebaseFirestore.instance
-                        .collection('chats')
-                        .where('vetId', isEqualTo: widget.vetId)
-                        .where('petOwnerId', isEqualTo: currentUser.uid)
-                        .get();
-
-                    String chatId;
-                    if (chatDoc.docs.isEmpty) {
-                      // Create new chat
-                      final newChatRef = await FirebaseFirestore.instance
-                          .collection('chats')
-                          .add({
-                        'vetId': widget.vetId,
-                        'petOwnerId': currentUser.uid,
-                        'vetName': vetName,
-                        'petOwnerName': currentUser.displayName ?? 'Pet Owner',
-                        'createdAt': FieldValue.serverTimestamp(),
-                        'lastMessage': '',
-                        'lastMessageTime': FieldValue.serverTimestamp(),
-                      });
-                      chatId = newChatRef.id;
-                    } else {
-                      chatId = chatDoc.docs.first.id;
-                    }
-
-                    if (!mounted) return;
-
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ChatScreen(
-                          chatId: chatId,
-                          senderId: currentUser.uid,
-                          receiverId: widget.vetId,
-                          senderName: currentUser.displayName ?? 'Pet Owner',
-                          receiverName: vetName,
-                        ),
-                      ),
-                    );
-                  },
-                );
-              }
-              return const SizedBox.shrink();
-            },
-          ),
-        ],
+        title: const Text('Make Appointment'),
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Vet: $vetName',
-                style:
-                    const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            Text('Fee: $vetFee Rs', style: const TextStyle(fontSize: 18)),
-            const SizedBox(height: 20),
+            if (userPets.isEmpty)
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text('Please add a pet first to book an appointment'),
+                ),
+              )
+            else
+              DropdownButtonFormField<String>(
+                decoration: const InputDecoration(labelText: 'Select Pet'),
+                value: selectedPetId,
+                items: userPets.map((pet) {
+                  return DropdownMenuItem<String>(
+                    value: pet['id'] as String,
+                    child: Text(pet['petName']?.toString() ?? 'Unnamed Pet'),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() => selectedPetId = value);
+                },
+              ),
+            const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _selectDate,
               child: Text(selectedDate == null
-                  ? "Select Date"
-                  : selectedDate!.toLocal().toString().split(' ')[0]),
+                  ? 'Select Date'
+                  : 'Date: ${selectedDate!.toString().split(' ')[0]}'),
             ),
-            const SizedBox(height: 20),
-            const Text("Select Time Slot",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              children: availableSlots.map((slot) {
-                final isSelected = selectedTime == slot;
-                return ChoiceChip(
-                  label: Text(slot.format(context)),
-                  selected: isSelected,
-                  onSelected: (_) => setState(() {
-                    selectedTime = slot;
-                  }),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: _confirmAppointment,
-              child: const Text("Confirm Appointment"),
-            ),
+            if (selectedDate != null && availableSlots.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text('Available Time Slots:'),
+              Wrap(
+                spacing: 8,
+                children: availableSlots.map((slot) {
+                  return ElevatedButton(
+                    onPressed: () {
+                      setState(() => selectedTime = slot);
+                      _confirmAppointment();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: selectedTime == slot
+                          ? Theme.of(context).primaryColor
+                          : null,
+                    ),
+                    child: Text(slot.format(context)),
+                  );
+                }).toList(),
+              ),
+            ],
           ],
         ),
       ),

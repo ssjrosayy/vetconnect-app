@@ -1,0 +1,23 @@
+{
+  "dog": [
+    "Mange",
+    "Hot Spots",
+    "Allergic Dermatitis",
+    "Folliculitis",
+    "Acral Lick Granuloma"
+  ],
+  "cat": [
+    "Ringworm",
+    "Flea Allergy",
+    "Miliary Dermatitis",
+    "Eosinophilic Granuloma",
+    "Acne"
+  ],
+  "cattle": [
+    "Ringworm",
+    "Dermatophilosis",
+    "Lumpy Skin Disease",
+    "Photosensitization",
+    "Warts"
+  ]
+}
